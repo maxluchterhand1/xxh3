@@ -9,11 +9,21 @@ const int kXXHPrime32_1 = 0x9E3779B1;
 const int kXXHPrime32_2 = 0x85EBCA77;
 const int kXXHPrime32_3 = 0xC2B2AE3D;
 
-const int kXXHPrime64_1 = 0x9E3779B185EBCA87;
-const int kXXHPrime64_2 = 0xC2B2AE3D27D4EB4F;
-const int kXXHPrime64_3 = 0x165667B19E3779F9;
-const int kXXHPrime64_4 = 0x85EBCA77C2B2AE63;
-const int kXXHPrime64_5 = 0x27D4EB2F165667C5;
+const int kXXHPrime64_1_HIGH = 0x9E3779B1;
+const int kXXHPrime64_1_LOW = 0x85EBCA87;
+const int kXXHPrime64_2_HIGH = 0xC2B2AE3D;
+const int kXXHPrime64_2_LOW = 0x27D4EB4F;
+const int kXXHPrime64_3_HIGH = 0x165667B1;
+const int kXXHPrime64_3_LOW = 0x9E3779F9;
+const int kXXHPrime64_4_HIGH = 0x85EBCA77;
+const int kXXHPrime64_4_LOW = 0xC2B2AE63;
+const int kXXHPrime64_5_HIGH = 0x27D4EB2F;
+const int kXXHPrime64_5_LOW = 0x165667C5;
+
+int mix64(int high, int low) {
+  // Combine high and low parts using bitwise operations
+  return (high * 0x100000000) + low;
+}
 
 /// The number of secret bytes consumed at each accumulation.
 const int kSecretConsumeRate = 8;
@@ -49,9 +59,9 @@ final kSecret = Uint8List.fromList([
 /// bit in the output digest thereby removing bias from the distribution.
 int _xXH64Avalanche(int h) {
   h ^= h >>> 33;
-  h *= kXXHPrime64_2;
+  h *= mix64(kXXHPrime64_2_HIGH, kXXHPrime64_2_LOW);
   h ^= h >>> 29;
-  h *= kXXHPrime64_3;
+  h *= mix64(kXXHPrime64_3_HIGH, kXXHPrime64_3_LOW);
   return h ^ (h >>> 32);
 }
 
@@ -60,7 +70,7 @@ int _xXH64Avalanche(int h) {
 /// mixed.
 int _xXH3Avalanche(int h) {
   h ^= h >>> 37;
-  h *= 0x165667919E3779F9;
+  h *= mix64(0x16566791, 0x9E3779F9);
   return h ^ (h >>> 32);
 }
 
@@ -69,9 +79,9 @@ int _xXH3Avalanche(int h) {
 /// mixed.
 int _xXH3rrmxmx(int h, int length) {
   h ^= ((h << 49) | (h >>> 15)) ^ ((h << 24) | (h >>> 40));
-  h *= 0x9FB21C651E98DF25;
+  h *= mix64(0x9FB21C65, 0x1E98DF25);
   h ^= (h >>> 35) + length;
-  h *= 0x9FB21C651E98DF25;
+  h *= mix64(0x9FB21C65, 0x1E98DF25);
   return h ^ (h >>> 28);
 }
 
@@ -119,12 +129,12 @@ int xXH3HashLong64bInternal(Uint8List input, int seed, Uint8List secret) {
 
   final acc = [
     kXXHPrime32_3,
-    kXXHPrime64_1,
-    kXXHPrime64_2,
-    kXXHPrime64_3,
-    kXXHPrime64_4,
+    mix64(kXXHPrime64_1_HIGH, kXXHPrime64_1_LOW),
+    mix64(kXXHPrime64_2_HIGH, kXXHPrime64_2_LOW),
+    mix64(kXXHPrime64_3_HIGH, kXXHPrime64_3_LOW),
+    mix64(kXXHPrime64_4_HIGH, kXXHPrime64_4_LOW),
     kXXHPrime32_2,
-    kXXHPrime64_5,
+    mix64(kXXHPrime64_5_HIGH, kXXHPrime64_5_LOW),
     kXXHPrime32_1
   ];
   int nbStripesPerBlock = (secretLength - kStripeLength) ~/ kSecretConsumeRate;
@@ -167,7 +177,7 @@ int xXH3HashLong64bInternal(Uint8List input, int seed, Uint8List secret) {
     inputOffset: length - kStripeLength,
     secretOffset: secretLength - kStripeLength - 7,
   );
-  int result = length * kXXHPrime64_1;
+  int result = length * mix64(kXXHPrime64_1_HIGH, kXXHPrime64_1_LOW);
   for (int i = 0; i < 4; i++) {
     result += mul128Fold64(
       acc[2 * i] ^ readLE64(secret, 11 + 16 * i),
@@ -229,7 +239,7 @@ int xXH3_64bitsInternal({
         length + swap64(inputLo) + inputHi + mul128Fold64(inputLo, inputHi);
     return _xXH3Avalanche(acc);
   } else if (length <= 128) {
-    int acc = length * kXXHPrime64_1;
+    int acc = length * mix64(kXXHPrime64_1_HIGH, kXXHPrime64_1_LOW);
     int secretOff = 0;
     for (int i = 0, j = length; j > i; i += 16, j -= 16) {
       acc += _xXH3Mix16B(input, secret, seed,
@@ -240,7 +250,7 @@ int xXH3_64bitsInternal({
     }
     return _xXH3Avalanche(acc);
   } else if (length <= 240) {
-    int acc = length * kXXHPrime64_1;
+    int acc = length * mix64(kXXHPrime64_1_HIGH, kXXHPrime64_1_LOW);
     int nbRounds = length ~/ 16;
 
     int i = 0;
